@@ -1,0 +1,7 @@
+site_name: 我的公众号文章
+
+theme:
+  name: material
+
+nav:
+  - 首页: index.md
