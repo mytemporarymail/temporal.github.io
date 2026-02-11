@@ -355,6 +355,81 @@ def save_markdown(title, html):
     return filename, title  # 返回文件名和原始标题
 
 
+def sync_mkdocs_nav():
+    """同步 mkdocs.yml 导航：
+    1. 删除 mkdocs.yml 中不存在的文件条目
+    2. 添加 markdown 目录中的新文件
+    3. 保证导航与实际文件完全同步
+    """
+    mkdocs_file = "mkdocs.yml"
+    
+    try:
+        # 获取 markdown 目录中所有的 .md 文件
+        actual_files = set()
+        for file in os.listdir(OUTPUT_DIR):
+            if file.endswith(".md"):
+                actual_files.add(file)
+        
+        logger.info(f"检测到实际文件: {actual_files}")
+        
+        # 读取 mkdocs.yml
+        with open(mkdocs_file, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+        
+        if "nav" not in config:
+            config["nav"] = []
+        
+        # 收集所有需要显示的文章（不包括 index.md）
+        articles_to_show = {}  # {filename: title}
+        
+        # 首先遍历现有导航，收集存在的文章信息
+        for item in config["nav"]:
+            if isinstance(item, dict):
+                for title, filename in item.items():
+                    if filename != "index.md" and filename in actual_files:
+                        articles_to_show[filename] = title
+        
+        # 然后扫描 markdown 目录，添加未在导航中的文件
+        for filename in actual_files:
+            if filename != "index.md" and filename not in articles_to_show:
+                title = extract_title_from_file(filename)
+                articles_to_show[filename] = title
+                logger.info(f"✅ 发现新文章: '{title}' ({filename})")
+        
+        # 构建新的导航：首页 + 按文件名排序的文章
+        new_nav = [{"Home": "index.md"}]
+        
+        for filename in sorted(articles_to_show.keys()):
+            title = articles_to_show[filename]
+            new_nav.append({title: filename})
+        
+        # 保存更新后的配置
+        config["nav"] = new_nav
+        with open(mkdocs_file, "w", encoding="utf-8") as f:
+            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+        
+        logger.info(f"✅ mkdocs.yml 已同步: 共 {len(articles_to_show)} 篇文章")
+            
+    except Exception as e:
+        logger.error(f"❌ 同步 mkdocs.yml 失败: {e}")
+
+
+def extract_title_from_file(filename):
+    """从 markdown 文件中提取标题（第一行的 #）"""
+    try:
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#"):
+                    # 移除 # 和空格，获取标题
+                    title = line.lstrip("#").strip()
+                    return title if title else filename.replace(".md", "")
+        return filename.replace(".md", "")
+    except:
+        return filename.replace(".md", "")
+
+
 def update_mkdocs_nav(articles_files):
     """更新 mkdocs.yml 导航，添加新文章
     articles_files: [(filename, title), ...] 元组列表
@@ -398,6 +473,54 @@ def update_mkdocs_nav(articles_files):
         logger.error(f"更新 mkdocs.yml 失败: {e}")
 
 
+def update_index_page():
+    """自动更新 index.md，生成文章列表"""
+    mkdocs_file = "mkdocs.yml"
+    index_file = os.path.join(OUTPUT_DIR, "index.md")
+    
+    try:
+        # 读取 mkdocs.yml 获取所有文章
+        with open(mkdocs_file, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+        
+        nav = config.get("nav", [])
+        
+        # 生成文章列表内容
+        articles_list = []
+        for item in nav:
+            if isinstance(item, dict):
+                for title, filename in item.items():
+                    if filename != "index.md":  # 跳过首页本身
+                        articles_list.append((title, filename))
+        
+        # 构建新的 index.md 内容
+        index_content = """# WeChat Articles Archive
+
+欢迎来到微信公众号文章存档库！
+
+这里收集了精选的微信公众号文章，转换为静态网站格式方便阅读。
+
+## 📚 文章列表
+
+"""
+        
+        if articles_list:
+            for i, (title, filename) in enumerate(articles_list, 1):
+                # 生成链接（去掉 .md 后缀）
+                link = filename.replace(".md", "")
+                index_content += f"{i}. [{title}]({link})\n"
+        else:
+            index_content += "暂无文章\n"
+        
+        # 保存更新后的 index.md
+        with open(index_file, "w", encoding="utf-8") as f:
+            f.write(index_content)
+        
+        logger.info(f"index.md 已更新，包含 {len(articles_list)} 篇文章")
+    except Exception as e:
+        logger.error(f"更新 index.md 失败: {e}")
+
+
 def build_mkdocs():
     """运行 mkdocs build 重新构建网站"""
     try:
@@ -430,46 +553,10 @@ def main():
     delete_urls = load_delete_urls()
     if delete_urls:
         logger.info(f"准备删除 {len(delete_urls)} 篇文章...")
-        deleted_files = []
         for url in delete_urls:
             if delete_article(url):
-                deleted_files.append(url)
                 has_changes = True
                 logger.info(f"✅ 文章已删除: {url}")
-        
-        # 更新 mkdocs.yml 移除被删除的文章
-        if deleted_files:
-            mkdocs_file = "mkdocs.yml"
-            try:
-                with open(mkdocs_file, "r", encoding="utf-8") as f:
-                    config = yaml.safe_load(f) or {}
-                
-                if "nav" in config:
-                    # 从导航中移除已删除的文章
-                    new_nav = [config["nav"][0]]  # 保留首页
-                    
-                    for item in config["nav"][1:]:  # 跳过首页
-                        if isinstance(item, dict):
-                            for title, path in item.items():
-                                # 检查此条目是否对应被删除的文章
-                                is_deleted = False
-                                for del_url in deleted_files:
-                                    articles = load_downloaded_urls()
-                                    if del_url in articles and articles[del_url].get("filename") == path:
-                                        is_deleted = True
-                                        break
-                                
-                                if not is_deleted:
-                                    new_nav.append(item)
-                        else:
-                            new_nav.append(item)
-                    
-                    config["nav"] = new_nav
-                    with open(mkdocs_file, "w", encoding="utf-8") as f:
-                        yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
-                    logger.info("✅ mkdocs.yml 已更新（移除已删除的文章）")
-            except Exception as e:
-                logger.error(f"❌ 更新 mkdocs.yml 失败: {e}")
     else:
         logger.info("无需删除文章")
 
@@ -508,22 +595,16 @@ def main():
             
             driver.quit()
             logger.info("浏览器已关闭")
-            
-            # 更新 mkdocs 导航
-            if article_files_to_update:
-                logger.info("正在更新 MkDocs 配置...")
-                update_mkdocs_nav(article_files_to_update)
         else:
             logger.info("所有文章都已下载，无新文章处理")
-
-    # ============ 第三步：重建网站 ============
-    logger.info("\n--- 第三步：重新构建网站 ---")
-    if has_changes:
-        logger.info("检测到文章改动，执行完整重建...")
-        build_mkdocs()
-    else:
-        logger.info("⚠️  无文章改动，但执行一次网站构建...")
-        build_mkdocs()
+    # ============ 第三步：同步 mkdocs.yml ============
+    logger.info("\n--- 第三步：同步 mkdocs.yml（确保导航与文件一致） ---")
+    sync_mkdocs_nav()
+    update_index_page()
+    
+    # ============ 第四步：重建网站 ============
+    logger.info("\n--- 第四步：重新构建网站 ---")
+    build_mkdocs()
     
     logger.info("\n===== 全部任务完成 ✅ =====")
 

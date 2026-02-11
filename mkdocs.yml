@@ -1,7 +1,9 @@
+docs_dir: markdown
+nav:
+- Home: index.md
+- 对师，该如何供养？: 001.md
+- 对话清华刘子鸣：AI还没迎来自己的牛顿时代: 002.md
+site_dir: docs
 site_name: WeChat Articles
 theme:
   name: material
-docs_dir: markdown
-site_dir: docs
-nav:
-  - Home: index.md
