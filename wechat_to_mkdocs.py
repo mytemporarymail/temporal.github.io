@@ -402,7 +402,13 @@ def build_mkdocs():
     """运行 mkdocs build 重新构建网站"""
     try:
         logger.info("开始构建 MkDocs 网站...")
-        result = subprocess.run(["python", "-m", "mkdocs", "build"], capture_output=True, text=True)
+        # 在当前工作目录运行，确保找到 mkdocs.yml
+        result = subprocess.run(
+            ["python", "-m", "mkdocs", "build"],
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True
+        )
         
         if result.returncode == 0:
             logger.info("MkDocs 网站构建成功 ✅")
