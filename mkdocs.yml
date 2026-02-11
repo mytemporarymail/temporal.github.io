@@ -1,9 +1,9 @@
+docs_dir: markdown
 nav:
 - 首页: index.md
 - 全球近四成新发癌症或可预防: 全球近四成新发癌症或可预防.md
 - 对师该如何供养: 对师该如何供养.md
+site_dir: docs
 site_name: 我的公众号文章
 theme:
   name: material
-docs_dir: markdown
-site_dir: docs
