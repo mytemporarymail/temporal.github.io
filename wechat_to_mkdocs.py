@@ -5,6 +5,7 @@ import subprocess
 import requests
 import logging
 import yaml
+import hashlib
 
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
@@ -148,9 +149,17 @@ def download_image(url, filename):
         f.write(r.content)
 
 
-def process_images(html):
+def process_images(html, title, url):
     logger.info("处理文章中的图片...")
-    os.makedirs(IMAGE_DIR, exist_ok=True)
+    
+    # 用 URL 的哈希值来区分文章，确保唯一性（即使标题重复）
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    safe_title = "".join(c if c.isalnum() or c in "._- " else "" for c in title).strip()
+    safe_title = safe_title.replace(" ", "_") or "article"
+    
+    # 文件夹名格式：标题_哈希值（可读性 + 唯一性）
+    article_image_dir = os.path.join(IMAGE_DIR, f"{safe_title}_{url_hash}")
+    os.makedirs(article_image_dir, exist_ok=True)
 
     soup = BeautifulSoup(str(html), "html.parser")
     imgs = soup.find_all("img")
@@ -167,11 +176,11 @@ def process_images(html):
             ext = ".png"
 
         filename = f"img_{i}{ext}"
-        filepath = os.path.join(IMAGE_DIR, filename)
+        filepath = os.path.join(article_image_dir, filename)
 
         try:
             download_image(src, filepath)
-            img["src"] = f"images/{filename}"
+            img["src"] = f"images/{safe_title}_{url_hash}/{filename}"
             logger.info(f"图片保存成功: {filename}")
         except Exception as e:
             logger.error(f"图片下载失败: {src} | {e}")
@@ -303,7 +312,7 @@ def main():
         try:
             title, html = fetch_article_html(driver, url)
             logger.info(f"开始处理文章: {title}")
-            html = process_images(html)
+            html = process_images(html, title, url)
             md_file = save_markdown(title, html)
             articles_files.append(md_file)
             
