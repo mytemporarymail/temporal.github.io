@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # 配置区
 # ========================
 
-OUTPUT_DIR = "docs"
+OUTPUT_DIR = "markdown"  # 源文件目录
 IMAGE_DIR = os.path.join(OUTPUT_DIR, "images")
 CONFIG_FILE = "articles.txt"
 DOWNLOADED_FILE = "downloaded.json"  # 记录已下载的URL

@@ -5,3 +5,5 @@ nav:
 site_name: 我的公众号文章
 theme:
   name: material
+docs_dir: markdown
+site_dir: docs
