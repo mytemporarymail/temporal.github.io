@@ -182,13 +182,8 @@ def process_images(html):
 def save_markdown(title, html):
     logger.info("转换为 Markdown 格式...")
     
-    # 使用自定义配置来保留排版和缩进
-    md_text = md(
-        html,
-        heading_style="underlined",  # 更好的标题风格
-        strip=False,  # 不去除空格
-        escape_misc=False,  # 不转义杂项字符
-    )
+    # 简单转换为 markdown
+    md_text = md(html)
     
     # 清理多余的空行（但保留段落间距）
     lines = md_text.split('\n')

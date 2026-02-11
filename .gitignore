@@ -1,3 +1,6 @@
+# mkdocs 之前的输出目录
+/site/
+
 # Python 缓存
 __pycache__/
 *.py[cod]
